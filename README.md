@@ -1,5 +1,18 @@
 # AQI Automation Twitter Bot
 
+## Cronjob
+
+Create `.env` with the template as in `.env.sample` first. Replace `okhla` with your city in `job.py` line 38.
+
+```bash
+chmod +x install-job.sh
+./install-job.sh
+```
+
+Note: if you receive errors regarding user has no crontab, generate one by executing `crontab -e` once and inserting an empty line.
+
+## Watch Tweets as a Stream
+
 Create `.env` with the template as in `.env.sample` first.
 
 ```bash
