@@ -47,6 +47,7 @@ class AQIStreamListener(tweepy.StreamListener):
                 auto_populate_reply_metadata=True
             )
             return
+        api.create_favorite(status.id)
         data = get_station_data(stn)
         api.update_status(
             status=f"AQI for {data['city']['name']}: {data['aqi']}",
