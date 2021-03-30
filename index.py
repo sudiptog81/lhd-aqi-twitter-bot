@@ -1,62 +1,69 @@
-import os
 import tweepy
-import requests
-from dotenv import load_dotenv
+import inspect
+from helper import *
 
-load_dotenv()
-
-auth = tweepy.OAuthHandler(
-    os.environ.get("TWITTER_API_KEY"),
-    os.environ.get("TWITTER_API_SECRET")
-)
-auth.set_access_token(
-    os.environ.get("TWITTER_ACCESS_KEY"),
-    os.environ.get("TWITTER_ACCESS_SECRET")
-)
-
-api = tweepy.API(auth)
-
-
-def get_station(query: str) -> str:
-    aqicn_key = os.environ.get("AQICN_TOKEN")
-    response = requests.get(
-        f"https://api.waqi.info/search/?token={aqicn_key}&keyword={query}"
-    )
-    if (len(response.json()['data']) > 0):
-        return response.json()['data'][0]['uid']
-    return
-
-
-def get_station_data(uid: str) -> dict:
-    aqicn_key = os.environ.get("AQICN_TOKEN")
-    response = requests.get(
-        f"https://api.waqi.info/feed/@{uid}/?token={aqicn_key}"
-    )
-    return response.json()['data']
+api = None
 
 
 class AQIStreamListener(tweepy.StreamListener):
 
     def on_status(self, status):
-        query = ' '.join(status.text.split()[1:])
-        stn = get_station(query)
-        if (stn == None):
-            api.update_status(
-                status=f"No station found for \"{query}\"",
-                in_reply_to_status_id=status.id,
-                auto_populate_reply_metadata=True
-            )
-            return
-        api.create_favorite(status.id)
-        data = get_station_data(stn)
-        api.update_status(
-            status=f"AQI for {data['city']['name']}: {data['aqi']}",
-            in_reply_to_status_id=status.id,
-            auto_populate_reply_metadata=True
-        )
-        return
+        try:
+            qry = ''
+            twt = status.text.split()
+            api.create_favorite(status.id)
+
+            if twt[0] == "@AQITwtBot":
+                qry = ' '.join(twt[1:])
+            else:
+                if str(status.user.screen_name).lower() != 'aqitwtbot':
+                    api.update_status(
+                        status=inspect.cleandoc(
+                            f"""
+                            Reply to this tweet with <city name> or Tweet @AQITwtBot <city name> to get the latest #AQI updates!
+                            """
+                        ),
+                        in_reply_to_status_id=status.id,
+                        auto_populate_reply_metadata=True
+                    )
+                    return
+
+            if (qry):
+                stn = get_station(qry)
+                data = get_station_data(stn)
+
+                if data == "Unknown station":
+                    api.update_status(
+                        status=inspect.cleandoc(
+                            f"""
+                            Oops! An air quality monitoring station was not found for that place. Try again with a different place maybe! #AQI
+                            """
+                        ),
+                        in_reply_to_status_id=status.id,
+                        auto_populate_reply_metadata=True
+                    )
+                    return
+
+                twt = api.update_status(
+                    status=inspect.cleandoc(
+                        f"""
+                        #AQI @ {data['city']['name']} is {data['aqi']} as on {data['time']['iso']} #Automation #AQITwtBot
+                        Source: World Air Quality Index Project
+                        """
+                    ),
+                    in_reply_to_status_id=status.id,
+                    auto_populate_reply_metadata=True
+                )
+        except Exception as e:
+            print("Error:", e)
 
 
-aqi_stream_listener = AQIStreamListener()
-stream = tweepy.Stream(auth=api.auth, listener=aqi_stream_listener)
-stream.filter(track=['#AQIAutomationBot'])
+if __name__ == "__main__":
+    try:
+        api = init()
+        stream_listener = AQIStreamListener()
+        stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
+        print("Listening for mentions of @AQITwtBot")
+        stream.filter(track=['AQITwtBot'])
+    except Exception as e:
+        print("Error:", str(e))

@@ -1,43 +1,25 @@
-import os
-import tweepy
-import requests
-from dotenv import load_dotenv
+import inspect
+from helper import *
 
-load_dotenv()
-
-auth = tweepy.OAuthHandler(
-    os.environ.get("TWITTER_API_KEY"),
-    os.environ.get("TWITTER_API_SECRET")
-)
-auth.set_access_token(
-    os.environ.get("TWITTER_ACCESS_KEY"),
-    os.environ.get("TWITTER_ACCESS_SECRET")
-)
-
-api = tweepy.API(auth)
-
-
-def get_station(query: str) -> str:
-    aqicn_key = os.environ.get("AQICN_TOKEN")
-    response = requests.get(
-        f"https://api.waqi.info/search/?token={aqicn_key}&keyword={query}"
-    )
-    if (len(response.json()['data']) > 0):
-        return response.json()['data'][0]['uid']
-    return
-
-
-def get_station_data(uid: str) -> dict:
-    aqicn_key = os.environ.get("AQICN_TOKEN")
-    response = requests.get(
-        f"https://api.waqi.info/feed/@{uid}/?token={aqicn_key}"
-    )
-    return response.json()['data']
-
-
-stn = get_station('okhla')
-data = get_station_data(stn)
-api.update_status(
-    status=f"#AQI for {data['city']['name']} is {data['aqi']} as on {data['time']['iso']} #AQIAutomationBot Source: {data['attributions'][0]['name']}, World Air Quality Index Project",
-    auto_populate_reply_metadata=True
-)
+if __name__ == "__main__":
+    try:
+        api = init()
+        stn = get_station('delhi, us embassy')
+        data = get_station_data(stn)
+        if data == "Unknown station":
+            raise Exception("Station not found")
+        twt = api.update_status(
+            status=inspect.cleandoc(
+                f"""
+                #AQI @ {data['city']['name']} is {data['aqi']} as on {data['time']['iso']} #AQIAutomationBot
+                Source: World Air Quality Index Project
+                """
+            ),
+            lat=data['city']['geo'][0],
+            long=data['city']['geo'][1],
+            display_coordinates=True,
+            auto_populate_reply_metadata=True
+        )
+        print("Tweeted " + str(twt.id))
+    except Exception as e:
+        print("Error: " + str(e))
