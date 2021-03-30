@@ -17,7 +17,7 @@ class AQIStreamListener(tweepy.StreamListener):
                 qry = ' '.join(twt[1:])
             else:
                 if str(status.user.screen_name).lower() != 'aqitwtbot':
-                    api.update_status(
+                    twt = api.update_status(
                         status=inspect.cleandoc(
                             f"""
                             Reply to this tweet with <city name> or Tweet @AQITwtBot <city name> to get the latest #AQI updates!
@@ -26,14 +26,13 @@ class AQIStreamListener(tweepy.StreamListener):
                         in_reply_to_status_id=status.id,
                         auto_populate_reply_metadata=True
                     )
-                    return
 
-            if (qry):
+            if (len(qry) > 0):
                 stn = get_station(qry)
                 data = get_station_data(stn)
 
                 if data == "Unknown station":
-                    api.update_status(
+                    twt = api.update_status(
                         status=inspect.cleandoc(
                             f"""
                             Oops! An air quality monitoring station was not found for that place. Try again with a different place maybe! #AQI
@@ -42,18 +41,19 @@ class AQIStreamListener(tweepy.StreamListener):
                         in_reply_to_status_id=status.id,
                         auto_populate_reply_metadata=True
                     )
-                    return
+                else:
+                    twt = api.update_status(
+                        status=inspect.cleandoc(
+                            f"""
+                            #AQI @ {data['city']['name']} is {data['aqi']} as on {data['time']['iso']} #Automation #AQITwtBot
+                            Source: World Air Quality Index Project
+                            """
+                        ),
+                        in_reply_to_status_id=status.id,
+                        auto_populate_reply_metadata=True
+                    )
 
-                twt = api.update_status(
-                    status=inspect.cleandoc(
-                        f"""
-                        #AQI @ {data['city']['name']} is {data['aqi']} as on {data['time']['iso']} #Automation #AQITwtBot
-                        Source: World Air Quality Index Project
-                        """
-                    ),
-                    in_reply_to_status_id=status.id,
-                    auto_populate_reply_metadata=True
-                )
+                print("Tweeted", str(twt.id))
         except Exception as e:
             print("Error:", e)
 
